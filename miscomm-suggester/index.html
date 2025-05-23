@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Miscommunication Activity Suggestor</title>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 2rem; }
+    #circle { width: 120px; height: 120px; margin: 1rem auto; border-radius: 50%; background: red; animation: hue 3s infinite alternate; }
+    @keyframes hue { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(60deg); } }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    input[type="text"], input[type="number"] { padding: 0.5rem; width: 80%; margin-top: 1rem; }
+    button { padding: 0.5rem 1rem; margin: 0.5rem; cursor: pointer; }
+    ol { text-align: left; display: inline-block; margin-top: 1rem; }
+    #timerDisplay { font-size: 1.5rem; margin-top: 1rem; }
+    #loading { display: none; }
+  </style>
+</head>
+<body>
+  <div id="screen1" class="screen active">
+    <h2>What's your problem?</h2>
+    <div id="circle"></div>
+    <input type="text" id="problemInput" placeholder="Describe your miscommunication issue..." />
+    <br />
+    <button id="submitBtn">Submit</button>
+    <p id="loading">Processing...</p>
+  </div>
+
+  <div id="screen2" class="screen">
+    <h2>Suggested Activity</h2>
+    <h3 id="activityTitle"></h3>
+    <p><strong>Focus Area:</strong> <span id="activityCategory"></span></p>
+    <p id="activityExplanation"></p>
+    <ol id="activitySteps"></ol>
+    <div>
+      <label for="timerInput">Set timer (minutes):</label><br />
+      <input type="number" id="timerInput" min="1" max="60" placeholder="e.g. 5" />
+      <button id="startTimerBtn">Start Timer</button>
+      <div id="timerDisplay"></div>
+    </div>
+    <button id="backBtn">Back</button>
+  </div>
+
+  <script>
+    const submitBtn = document.getElementById('submitBtn');
+    const backBtn = document.getElementById('backBtn');
+    const startTimerBtn = document.getElementById('startTimerBtn');
+    const screen1 = document.getElementById('screen1');
+    const screen2 = document.getElementById('screen2');
+    const loadingText = document.getElementById('loading');
+    const activityTitle = document.getElementById('activityTitle');
+    const activityCategory = document.getElementById('activityCategory');
+    const activityExplanation = document.getElementById('activityExplanation');
+    const activitySteps = document.getElementById('activitySteps');
+    const timerInput = document.getElementById('timerInput');
+    const timerDisplay = document.getElementById('timerDisplay');
+    let timerInterval;
+
+    const activities = [/* same list as before */];
+
+    async function fetchActivity(problem) {
+      const res = await fetch('/.netlify/functions/getActivity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problem })
+      });
+      const data = await res.json();
+      return data.activityTitle;
+    }
+
+    submitBtn.addEventListener('click', async () => {
+      const problem = document.getElementById('problemInput').value.trim();
+      if (!problem) return alert('Please describe your problem.');
+      loadingText.style.display = 'block';
+      submitBtn.disabled = true;
+
+      let title;
+      try {
+        title = await fetchActivity(problem);
+      } catch (err) {
+        alert('Error fetching activity.');
+        console.error(err);
+        loadingText.style.display = 'none';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const choice = activities.find(a => a.title === title) || activities[0];
+
+      activityTitle.textContent = choice.title;
+      activityCategory.textContent = choice.category;
+      activityExplanation.textContent = choice.explanation;
+      activitySteps.innerHTML = '';
+      choice.steps.forEach(step => {
+        const li = document.createElement('li'); li.textContent = step;
+        activitySteps.appendChild(li);
+      });
+
+      loadingText.style.display = 'none';
+      submitBtn.disabled = false;
+      screen1.classList.remove('active');
+      screen2.classList.add('active');
+    });
+
+    backBtn.addEventListener('click', () => {
+      clearInterval(timerInterval);
+      timerDisplay.textContent = '';
+      timerInput.value = '';
+      document.getElementById('problemInput').value = '';
+      screen2.classList.remove('active');
+      screen1.classList.add('active');
+    });
+
+    startTimerBtn.addEventListener('click', () => {
+      clearInterval(timerInterval);
+      let minutes = parseInt(timerInput.value);
+      if (!minutes || minutes < 1) return alert('Enter a valid minute count.');
+      let seconds = minutes * 60;
+      timerDisplay.textContent = `${minutes}:00`;
+      timerInterval = setInterval(() => {
+        seconds--;
+        const m = Math.floor(seconds/60), s = seconds % 60;
+        timerDisplay.textContent = `${m}:${s<10?'0'+s:s}`;
+        if (seconds <= 0) {
+          clearInterval(timerInterval);
+          alert('Time is up!');
+        }
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
